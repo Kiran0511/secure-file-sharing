@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Audit Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🛡️ Security Audit Dashboard</h1>
+            <p class="text-gray-600">Monitor and analyze security events in real-time</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                        📊
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Events (24h)</p>
+                        <p class="text-2xl font-semibold text-gray-900" id="total-events">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                        ✅
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Successful Events</p>
+                        <p class="text-2xl font-semibold text-gray-900" id="success-events">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-100 text-red-600">
+                        ❌
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Failed Events</p>
+                        <p class="text-2xl font-semibold text-gray-900" id="failed-events">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                        🚨
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Security Alerts</p>
+                        <p class="text-2xl font-semibold text-gray-900" id="security-alerts">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Event Types Distribution</h3>
+                <canvas id="eventTypesChart" width="400" height="300"></canvas>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Success vs Failure Rate</h3>
+                <canvas id="successFailureChart" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">🔍 Filter Audit Logs</h3>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">User Email</label>
+                    <input type="email" id="filter-email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Action Type</label>
+                    <select id="filter-action" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">All Actions</option>
+                        <option value="FILE_UPLOAD">File Upload</option>
+                        <option value="FILE_DOWNLOAD">File Download</option>
+                        <option value="FILE_REVOKE">File Revoke</option>
+                        <option value="TOKEN_GENERATION">Token Generation</option>
+                        <option value="OTP_GENERATION">OTP Generation</option>
+                        <option value="OTP_VERIFICATION">OTP Verification</option>
+                        <option value="ADMIN_ACTION">Admin Action</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="filter-status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">All Status</option>
+                        <option value="SUCCESS">Success</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="PENDING">Pending</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                    <input type="datetime-local" id="filter-start-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                    <input type="datetime-local" id="filter-end-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+            </div>
+            <div class="mt-4 flex space-x-4">
+                <button onclick="applyFilters()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    Apply Filters
+                </button>
+                <button onclick="clearFilters()" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">
+                    Clear Filters
+                </button>
+                <button onclick="exportLogs()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                    Export CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- Audit Logs Table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">📋 Recent Audit Logs</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-logs-table" class="bg-white divide-y divide-gray-200">
+                        <!-- Logs will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-3 bg-gray-50 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        Showing <span id="logs-count">0</span> results
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="loadPreviousPage()" id="prev-btn" class="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50" disabled>
+                            Previous
+                        </button>
+                        <button onclick="loadNextPage()" id="next-btn" class="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentPage = 0;
+        const pageSize = 50;
+        let currentLogs = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardStats();
+            loadAuditLogs();
+        });
+
+        // Load dashboard statistics
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch('/api/admin/audit-stats?timeRange=24h');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('total-events').textContent = stats.total_events;
+                    document.getElementById('success-events').textContent = stats.successful_events;
+                    document.getElementById('failed-events').textContent = stats.failed_events;
+                    
+                    // Create charts
+                    createEventTypesChart(stats.action_breakdown);
+                    createSuccessFailureChart(stats.successful_events, stats.failed_events);
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+
+            // Load security alerts
+            try {
+                const response = await fetch('/api/admin/security-alerts');
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('security-alerts').textContent = result.data.total_failed_events;
+                }
+            } catch (error) {
+                console.error('Error loading security alerts:', error);
+            }
+        }
+
+        // Load audit logs
+        async function loadAuditLogs(filters = {}) {
+            try {
+                const params = new URLSearchParams({
+                    limit: pageSize,
+                    offset: currentPage * pageSize,
+                    ...filters
+                });
+
+                const response = await fetch(`/api/admin/audit-logs?${params}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentLogs = result.data;
+                    displayAuditLogs(result.data);
+                    updatePagination(result.data.length);
+                }
+            } catch (error) {
+                console.error('Error loading audit logs:', error);
+            }
+        }
+
+        // Display audit logs in table
+        function displayAuditLogs(logs) {
+            const tableBody = document.getElementById('audit-logs-table');
+            tableBody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                const statusClass = log.status === 'SUCCESS' ? 'text-green-600 bg-green-100' : 
+                                   log.status === 'FAILED' ? 'text-red-600 bg-red-100' : 
+                                   'text-yellow-600 bg-yellow-100';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${new Date(log.timestamp).toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                            ${log.action_type}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${log.user_email}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${statusClass}">
+                            ${log.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${log.ip_address || 'N/A'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        <details class="cursor-pointer">
+                            <summary class="hover:text-blue-600">View Details</summary>
+                            <pre class="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto max-w-xs">
+${JSON.stringify(log.details, null, 2)}
+                            </pre>
+                        </details>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+
+            document.getElementById('logs-count').textContent = logs.length;
+        }
+
+        // Create event types chart
+        function createEventTypesChart(actionBreakdown) {
+            const ctx = document.getElementById('eventTypesChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(actionBreakdown),
+                    datasets: [{
+                        data: Object.values(actionBreakdown),
+                        backgroundColor: [
+                            '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
+                            '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create success/failure chart
+        function createSuccessFailureChart(successCount, failureCount) {
+            const ctx = document.getElementById('successFailureChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Success', 'Failed'],
+                    datasets: [{
+                        data: [successCount, failureCount],
+                        backgroundColor: ['#10B981', '#EF4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Filter functions
+        function applyFilters() {
+            const filters = {
+                userEmail: document.getElementById('filter-email').value,
+                actionType: document.getElementById('filter-action').value,
+                status: document.getElementById('filter-status').value,
+                startDate: document.getElementById('filter-start-date').value,
+                endDate: document.getElementById('filter-end-date').value
+            };
+
+            // Remove empty filters
+            Object.keys(filters).forEach(key => {
+                if (!filters[key]) delete filters[key];
+            });
+
+            currentPage = 0;
+            loadAuditLogs(filters);
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-email').value = '';
+            document.getElementById('filter-action').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-start-date').value = '';
+            document.getElementById('filter-end-date').value = '';
+            
+            currentPage = 0;
+            loadAuditLogs();
+        }
+
+        // Pagination
+        function loadNextPage() {
+            currentPage++;
+            loadAuditLogs();
+        }
+
+        function loadPreviousPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                loadAuditLogs();
+            }
+        }
+
+        function updatePagination(logsCount) {
+            document.getElementById('prev-btn').disabled = currentPage === 0;
+            document.getElementById('next-btn').disabled = logsCount < pageSize;
+        }
+
+        // Export function
+        function exportLogs() {
+            const csv = convertToCSV(currentLogs);
+            downloadCSV(csv, 'audit-logs.csv');
+        }
+
+        function convertToCSV(logs) {
+            const headers = ['Timestamp', 'Action Type', 'User Email', 'Status', 'IP Address', 'Details'];
+            const rows = logs.map(log => [
+                log.timestamp,
+                log.action_type,
+                log.user_email,
+                log.status,
+                log.ip_address || '',
+                JSON.stringify(log.details)
+            ]);
+
+            return [headers, ...rows].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            loadDashboardStats();
+            loadAuditLogs();
+        }, 30000);
+    </script>
+</body>
+</html>

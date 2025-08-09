@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(42, 42, 42, 0.5);
+  }
+}

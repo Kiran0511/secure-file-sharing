@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Secure File Upload</title>
+</head>
+<body>
+  <h2>🔐 Upload File for Encryption & Secure Sharing</h2>
+  <form action="http://192.168.0.102:3000/api/Upload" method="POST" enctype="multipart/form-data">
+    <label for="senderEmail">Your Email (Sender):</label>
+    <input type="email" name="senderEmail" required /><br><br>
+
+    <label for="email">Receiver's Email:</label>
+    <input type="email" name="receiverEmail" required /><br><br>
+
+    <label for="PhoneNumber">Receiver's Number:</label>
+    <input type="text" name="phoneNumber" required /><br><br>
+
+
+    <label for="file">Select File:</label>
+    <input type="file" name="file" required /><br><br>
+
+
+    <button type="submit">Upload & Send OTP</button>
+  </form>
+  
+
+
+</body>
+</html>

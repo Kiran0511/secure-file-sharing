@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f2f5;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 40px 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #212529;
+      margin-bottom: 30px;
+    }
+
+    .loading {
+      font-style: italic;
+      color: #777;
+      text-align: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 30px 0;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+      background: #fff;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      border: 1px solid #dee2e6;
+      text-align: left;
+    }
+
+    th {
+      background-color: #007bff;
+      color: #fff;
+      text-transform: uppercase;
+      font-size: 14px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+
+    canvas {
+      display: block;
+      margin: 40px auto;
+      max-width: 600px;
+    }
+
+    @media (max-width: 768px) {
+      th, td {
+        font-size: 14px;
+      }
+
+      .container {
+        padding: 20px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📊 File Download Activity Dashboard</h2>
+
+    <div id="status" class="loading">Loading activity data...</div>
+    <button onclick="downloadCSV()" style="margin-bottom: 20px; padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+    ⬇️ Download Full Log (CSV)
+    </button>
+
+    <table id="activityTable" style="display: none;">
+      <thead>
+        <tr>
+          <th>Sender Email</th>
+          <th>Receiver Email</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Downloaded</th>
+          <th>Expiry Time</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <canvas id="summaryChart" width="600" height="300"></canvas>
+  </div>
+
+  <script>
+    async function fetchData() {
+      try {
+        const response = await fetch('/admin/dashboard');
+        const data = await response.json();
+
+        const table = document.getElementById("activityTable");
+        const tbody = document.getElementById("tableBody");
+        const status = document.getElementById("status");
+
+        if (!Array.isArray(data) || data.length === 0) {
+          status.textContent = "No activity records found.";
+          return;
+        }
+
+        tbody.innerHTML = "";
+
+        data.forEach(row => {
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+            <td>${row.sender_email}</td>
+            <td>${row.receiver_email}</td>
+            <td>${row.status}</td>
+            <td>${new Date(row.upload_time).toLocaleString()}</td>
+            <td>${row.download_time ? new Date(row.download_time).toLocaleString() : '—'}</td>
+            <td>${new Date(row.expiry_time).toLocaleString()}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        table.style.display = "table";
+        status.style.display = "none";
+
+      } catch (err) {
+        document.getElementById("status").textContent = "Error loading dashboard.";
+        console.error("❌ Failed to load dashboard:", err);
+      }
+    }
+
+    async function fetchSummaryAndDrawChart() {
+      try {
+        const response = await fetch('/admin/summary');
+        const { total_downloads, expired_tokens } = await response.json();
+
+        const ctx = document.getElementById('summaryChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Downloads', 'Expired'],
+            datasets: [{
+              label: '📦 File Status Count',
+              data: [total_downloads, expired_tokens],
+              backgroundColor: ['#28a745', '#dc3545'],
+              borderRadius: 6,
+              barThickness: 50
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1
+                }
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.error("❌ Failed to load chart:", err);
+      }
+    }
+
+    fetchData();
+    fetchSummaryAndDrawChart();
+  </script>
+  <script>
+    function downloadCSV() {
+        const rows = document.querySelectorAll("table tr");
+        let csvContent = "";
+
+        rows.forEach(row => {
+            const cols = row.querySelectorAll("th, td");
+            const rowData = [...cols].map(col => `"${col.textContent.trim()}"`).join(",");
+            csvContent += rowData + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.setAttribute("href", url);
+        link.setAttribute("download", `download-logs-${Date.now()}.csv`);
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        }
+
+  </script>
+</body>
+</html>
