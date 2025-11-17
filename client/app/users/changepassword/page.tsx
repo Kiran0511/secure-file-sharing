@@ -46,7 +46,7 @@ export default function ChangePasswordPage() {
     setIsLoading(true)
     try {
       const token = localStorage.getItem("accessToken")
-      const res = await axios.post("http://192.168.73.1:3000/api/changepassword", {
+      const res = await axios.post("http://localhost:3000/api/changepassword", {
         currentPassword,
         newPassword
       }, {

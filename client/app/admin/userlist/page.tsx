@@ -41,7 +41,7 @@ export default function UserListPage() {
             router.replace("/users/login")
             return
         }
-        axios.get("http://192.168.73.1:3000/api/admin/users", {
+        axios.get("http://localhost:3000/api/admin/users", {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => setUsers(res.data))
@@ -57,7 +57,7 @@ export default function UserListPage() {
         const token = localStorage.getItem("accessToken")
         try {
             const res = await axios.post(
-                "http://192.168.73.1:3000/api/admin/update-user-role",
+                "http://localhost:3000/api/admin/update-user-role",
                 { userId: id, newRole: updatedRole },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -82,7 +82,7 @@ export default function UserListPage() {
         const token = localStorage.getItem("accessToken")
         try {
             const res = await axios.post(
-                "http://192.168.73.1:3000/api/users/revoke",
+                "http://localhost:3000/api/users/revoke",
                 { uploadId },
                 {
                     headers: { Authorization: `Bearer ${token}` }

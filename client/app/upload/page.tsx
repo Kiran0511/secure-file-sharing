@@ -98,7 +98,7 @@ export default function UploadPage() {
       const token = localStorage.getItem("accessToken");
 
       const res = await axios.post(
-        "http://192.168.73.1:3000/api/upload/files", // Add the extra "/upload"
+        "http://192.168.0.100:3000/api/upload/files", // Add the extra "/upload"
         formData,
         {
           headers: {

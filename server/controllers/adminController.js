@@ -33,7 +33,7 @@ exports.getDashboardStats = async (req, res) => {
     const { count: expiredTokens, error: expiredError } = await supabase
       .from("file_shares")
       .select("*", { count: 'exact', head: true })
-      .lt("expiry_time", now);
+      .eq("status", "Expired");
 
     if (expiredError) {
       console.error("❌ Expired count error:", expiredError);
@@ -467,41 +467,25 @@ exports.getAuditStats = async (req, res) => {
         timeFilter = new Date(Date.now() - 24 * 60 * 60 * 1000);
     }
 
-    const timeFilterISO = timeFilter.toISOString();
     console.log('📊 Fetching audit stats for time range:', timeRange);
-    console.log('📅 Time filter:', timeFilterISO);
-
-    // First, check if failed_security_events table exists and has data
-    const { data: failedEventsCheck, error: failedCheckError } = await supabase
-      .from('failed_security_events')
-      .select('id')
-      .limit(1);
-
-    if (failedCheckError) {
-      console.error('❌ failed_security_events table check error:', failedCheckError);
-      console.log('⚠️ Continuing without failed events data...');
-    } else {
-      console.log('✅ failed_security_events table exists and is accessible');
-    }
+    console.log('📅 Time filter:', timeFilter.toISOString());
 
     // Get total events count from audit_logs
-    const { count: totalAuditEvents, error: totalError } = await supabase
+    const { count: totalEvents, error: totalError } = await supabase
       .from('audit_logs')
       .select('*', { count: 'exact', head: true })
-      .gte('timestamp', timeFilterISO);
+      .gte('timestamp', timeFilter.toISOString());
 
     if (totalError) {
-      console.error('❌ Total audit events error:', totalError);
+      console.error('❌ Total events error:', totalError);
       throw totalError;
     }
 
-    console.log('📊 Total audit events:', totalAuditEvents);
-
-    // Get successful events count from audit_logs
+    // Get successful events count from audit_logs - check for multiple success variations
     const { count: successfulEvents, error: successError } = await supabase
       .from('audit_logs')
       .select('*', { count: 'exact', head: true })
-      .gte('timestamp', timeFilterISO)
+      .gte('timestamp', timeFilter.toISOString())
       .in('status', ['SUCCESS', 'COMPLETED', 'successful', 'success']);
 
     if (successError) {
@@ -509,57 +493,35 @@ exports.getAuditStats = async (req, res) => {
       throw successError;
     }
 
-    console.log('📊 Successful events:', successfulEvents);
-
     // Get failed events count from failed_security_events table
-    let failedEvents = 0;
-    let securityAlerts = 0;
+    const { count: failedEvents, error: failedError } = await supabase
+      .from('failed_security_events')
+      .select('*', { count: 'exact', head: true })
+      .gte('timestamp', timeFilter.toISOString());
 
-    if (!failedCheckError) {
-      const { count: failedEventsCount, error: failedError } = await supabase
-        .from('failed_security_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', timeFilterISO);
+    if (failedError) {
+      console.error('❌ Failed events error:', failedError);
+      throw failedError;
+    }
 
-      if (failedError) {
-        console.error('❌ Failed events count error:', failedError);
-      } else {
-        failedEvents = failedEventsCount || 0;
-        console.log('📊 Failed events:', failedEvents);
-      }
+    // Get security alerts count (subset of failed_security_events with specific action types)
+    const { count: securityAlerts, error: securityError } = await supabase
+      .from('failed_security_events')
+      .select('*', { count: 'exact', head: true })
+      .gte('timestamp', timeFilter.toISOString())
+      .in('action_type', ['VIRUS_DETECTED', 'MALWARE_SCAN_FAILED', 'SUSPICIOUS_FILE', 'SECURITY_VIOLATION']);
 
-      // Get security alerts count (subset of failed events with security-related action types)
-      const { count: securityAlertsCount, error: securityError } = await supabase
-        .from('failed_security_events')
-        .select('*', { count: 'exact', head: true })
-        .gte('timestamp', timeFilterISO)
-        .in('action_type', ['VIRUS_DETECTED', 'MALWARE_SCAN_FAILED', 'SUSPICIOUS_FILE', 'SECURITY_VIOLATION', 'FILE_UPLOAD']);
-
-      if (securityError) {
-        console.error('❌ Security alerts error:', securityError);
-      } else {
-        securityAlerts = securityAlertsCount || 0;
-        console.log('📊 Security alerts:', securityAlerts);
-      }
-
-      // Debug: Show sample failed events
-      const { data: sampleFailedEvents, error: sampleError } = await supabase
-        .from('failed_security_events')
-        .select('*')
-        .gte('timestamp', timeFilterISO)
-        .order('timestamp', { ascending: false })
-        .limit(3);
-
-      if (!sampleError && sampleFailedEvents) {
-        console.log('📋 Sample failed events:', sampleFailedEvents);
-      }
+    if (securityError) {
+      console.error('❌ Security alerts error:', securityError);
+      // Don't throw here, just log and continue
+      console.warn('Setting security alerts to 0 due to error');
     }
 
     // Get action breakdown from audit_logs
     const { data: actionBreakdown, error: actionError } = await supabase
       .from('audit_logs')
       .select('action_type')
-      .gte('timestamp', timeFilterISO);
+      .gte('timestamp', timeFilter.toISOString());
 
     if (actionError) {
       console.error('❌ Action breakdown error:', actionError);
@@ -572,27 +534,55 @@ exports.getAuditStats = async (req, res) => {
       return acc;
     }, {}) || {};
 
-    // Also get action breakdown from failed_security_events if available
-    if (!failedCheckError) {
-      const { data: failedActionBreakdown, error: failedActionError } = await supabase
-        .from('failed_security_events')
-        .select('action_type')
-        .gte('timestamp', timeFilterISO);
+    // Also get action breakdown from failed_security_events
+    const { data: failedActionBreakdown, error: failedActionError } = await supabase
+      .from('failed_security_events')
+      .select('action_type')
+      .gte('timestamp', timeFilter.toISOString());
 
-      if (!failedActionError && failedActionBreakdown) {
-        failedActionBreakdown.forEach(log => {
-          if (log.action_type) {
-            actionCounts[log.action_type] = (actionCounts[log.action_type] || 0) + 1;
-          }
-        });
-      }
+    if (!failedActionError && failedActionBreakdown) {
+      failedActionBreakdown.forEach(log => {
+        if (log.action_type) {
+          actionCounts[log.action_type] = (actionCounts[log.action_type] || 0) + 1;
+        }
+      });
+    }
+
+    // Debug logs to see what we're getting
+    console.log('🔍 Audit stats debug:');
+    console.log('- Total events (audit_logs):', totalEvents);
+    console.log('- Successful events (audit_logs):', successfulEvents);
+    console.log('- Failed events (failed_security_events):', failedEvents);
+    console.log('- Security alerts (failed_security_events):', securityAlerts || 0);
+    console.log('- Action breakdown (combined):', actionCounts);
+
+    // Check what's in the failed_security_events table
+    const { data: failedEventsData, error: failedDataError } = await supabase
+      .from('failed_security_events')
+      .select('action_type, details, timestamp')
+      .gte('timestamp', timeFilter.toISOString())
+      .limit(5);
+
+    if (!failedDataError && failedEventsData) {
+      console.log('📋 Sample failed events:', failedEventsData);
+    }
+
+    // Check what actual status values exist in audit_logs
+    const { data: statusCheck, error: statusError } = await supabase
+      .from('audit_logs')
+      .select('status')
+      .gte('timestamp', timeFilter.toISOString());
+
+    if (!statusError && statusCheck) {
+      const uniqueStatuses = [...new Set(statusCheck.map(log => log.status))];
+      console.log('📋 Unique status values in audit_logs:', uniqueStatuses);
     }
 
     const stats = {
-      total_events: (totalAuditEvents || 0) + failedEvents,
+      total_events: (totalEvents || 0) + (failedEvents || 0), // Combined total
       successful_events: successfulEvents || 0,
-      failed_events: failedEvents,
-      security_alerts: securityAlerts,
+      failed_events: failedEvents || 0,
+      security_alerts: securityAlerts || 0,
       action_breakdown: actionCounts
     };
 
@@ -612,7 +602,7 @@ exports.getAuditStats = async (req, res) => {
   }
 };
 
-// Audit logs - Updated to use AuditLogger
+// Audit logs - FIXED: SQL Injection Prevention
 exports.getAuditLogs = async (req, res) => {
   try {
     const {
@@ -627,18 +617,74 @@ exports.getAuditLogs = async (req, res) => {
 
     console.log('📋 Fetching audit logs with filters:', { userEmail, actionType, status, startDate, endDate });
 
-    // Build time filter
-    const timeFilter = startDate ? new Date(startDate).toISOString() : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const endTimeFilter = endDate ? new Date(endDate).toISOString() : new Date().toISOString();
+    // ✅ SECURITY FIX: Input validation and sanitization
+    
+    // Validate and sanitize limit
+    const sanitizedLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 1000); // Max 1000 records
+    
+    // Validate and sanitize offset
+    const sanitizedOffset = Math.max(parseInt(offset) || 0, 0);
+    
+    // Validate email format if provided
+    if (userEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email format"
+      });
+    }
+    
+    // Validate action type against whitelist
+    const allowedActionTypes = [
+      'FILE_UPLOAD', 'FILE_DOWNLOAD', 'FILE_REVOKE', 'TOKEN_GENERATION', 
+      'OTP_GENERATION', 'OTP_VERIFICATION', 'ADMIN_ACTION', 'VIEW_DASHBOARD_STATS',
+      'VIEW_FILES_LIST', 'EXPORT_CSV', 'VIEW_USERS_LIST', 'UPDATE_USER_ROLE',
+      'VIRUS_DETECTED', 'MALWARE_SCAN_FAILED', 'SUSPICIOUS_FILE', 'SECURITY_VIOLATION'
+    ];
+    
+    if (actionType && actionType !== 'ALL' && !allowedActionTypes.includes(actionType)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid action type"
+      });
+    }
+    
+    // Validate status against whitelist
+    const allowedStatuses = ['SUCCESS', 'FAILED', 'PENDING', 'COMPLETED'];
+    if (status && status !== 'ALL' && !allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid status value"
+      });
+    }
+    
+    // Validate date formats
+    let timeFilter, endTimeFilter;
+    try {
+      timeFilter = startDate ? new Date(startDate).toISOString() : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      endTimeFilter = endDate ? new Date(endDate).toISOString() : new Date().toISOString();
+      
+      // Check if dates are valid
+      if (isNaN(new Date(timeFilter).getTime()) || isNaN(new Date(endTimeFilter).getTime())) {
+        throw new Error("Invalid date format");
+      }
+    } catch (dateError) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid date format. Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)"
+      });
+    }
 
-    // Get regular audit logs
+    // ✅ SECURITY FIX: Use parameterized queries with Supabase
+    // Get regular audit logs with proper filtering
     let auditQuery = supabase
       .from('audit_logs')
       .select('*')
       .gte('timestamp', timeFilter)
       .lte('timestamp', endTimeFilter)
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false })
+      .range(sanitizedOffset, sanitizedOffset + sanitizedLimit - 1); // Use range for pagination
 
+    // Apply filters using Supabase's built-in parameterization
     if (userEmail) {
       auditQuery = auditQuery.eq('user_email', userEmail);
     }
@@ -656,13 +702,14 @@ exports.getAuditLogs = async (req, res) => {
       throw auditError;
     }
 
-    // Get failed security events
+    // Get failed security events with the same security measures
     let failedQuery = supabase
       .from('failed_security_events')
       .select('*')
       .gte('timestamp', timeFilter)
       .lte('timestamp', endTimeFilter)
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false })
+      .range(sanitizedOffset, sanitizedOffset + sanitizedLimit - 1);
 
     if (userEmail) {
       failedQuery = failedQuery.eq('user_email', userEmail);
@@ -670,7 +717,6 @@ exports.getAuditLogs = async (req, res) => {
     if (actionType && actionType !== 'ALL') {
       failedQuery = failedQuery.eq('action_type', actionType);
     }
-    // Note: failed_security_events doesn't have a status column, so skip status filter for these
 
     const { data: failedEvents, error: failedError } = await failedQuery;
 
@@ -692,28 +738,48 @@ exports.getAuditLogs = async (req, res) => {
       details: event.details || {}
     }));
 
-    // Apply status filter to combined results if specified
+    // Combine and filter results
     let allLogs = [...(auditLogs || []), ...transformedFailedEvents];
     
+    // Apply status filter to combined results if specified
     if (status && status !== 'ALL') {
       allLogs = allLogs.filter(log => log.status === status);
     }
 
-    // Sort and paginate
-    allLogs = allLogs
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    // Sort by timestamp (most recent first)
+    allLogs = allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     console.log(`✅ Retrieved ${allLogs.length} total logs (${auditLogs?.length || 0} audit + ${transformedFailedEvents.length} failed)`);
+
+    // ✅ SECURITY: Log the admin access attempt
+    try {
+      const adminEmail = req.user?.email || 'admin@system';
+      const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
+      const userAgent = req.headers['user-agent'];
+      
+      await AuditLogger.logAdminAction(
+        adminEmail,
+        'VIEW_AUDIT_LOGS',
+        null,
+        ipAddress,
+        userAgent,
+        { 
+          filters_applied: { userEmail, actionType, status, startDate, endDate },
+          results_count: allLogs.length 
+        }
+      );
+    } catch (auditLogError) {
+      console.warn('⚠️ Failed to log admin action:', auditLogError.message);
+    }
 
     res.json({
       success: true,
       data: allLogs,
       pagination: {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        totalCount: (auditLogs?.length || 0) + transformedFailedEvents.length,
-        hasMore: allLogs.length === parseInt(limit)
+        limit: sanitizedLimit,
+        offset: sanitizedOffset,
+        totalCount: allLogs.length,
+        hasMore: allLogs.length === sanitizedLimit
       }
     });
   } catch (err) {
@@ -721,7 +787,7 @@ exports.getAuditLogs = async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: "Error fetching audit logs",
-      details: err.message 
+      details: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
     });
   }
 };

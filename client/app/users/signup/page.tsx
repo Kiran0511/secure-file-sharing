@@ -46,7 +46,7 @@ export default function UserSignupPage() {
     setSuccess("")
     setIsLoading(true)
     try {
-      const res = await axios.post("http://192.168.73.1:3000/api/auth/signup", {
+      const res = await axios.post("http://localhost:3000/api/auth/signup", {
         email: formData.email,
         password: formData.password,
       })

@@ -78,7 +78,7 @@ export default function DownloadPage() {
     setMessage(null)
     try {
       const res = await axios.post(
-        "http://192.168.73.1:3000/api/verify-otp",
+        "http://localhost:3000/api/verify-otp",
         { token: formData.token, otp: formData.otp },
         { responseType: "blob" }
       )

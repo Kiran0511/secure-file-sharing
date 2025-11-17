@@ -1,6 +1,5 @@
 "use client"
 
-
 import { useEffect, useState } from "react"
 import axios from "axios"
 import { useRouter } from "next/navigation"
@@ -117,21 +116,21 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         // Fetch dashboard stats
-        const statsResponse = await axios.get("http://192.168.73.1:3000/api/admin/dashboard/stats", {
+        const statsResponse = await axios.get("http://localhost:3000/api/admin/dashboard/stats", {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📊 Stats response:', statsResponse.data);
         setStats(statsResponse.data);
 
         // Fetch file transfer data
-        const filesResponse = await axios.get("http://192.168.73.1:3000/api/admin/dashboard/files", {
+        const filesResponse = await axios.get("http://localhost:3000/api/admin/dashboard/files", {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📁 Files response:', filesResponse.data);
         setFileData(filesResponse.data);
 
         // Fetch status counts
-        const statusResponse = await axios.get("http://192.168.73.1:3000/api/admin/dashboard/status-counts", {
+        const statusResponse = await axios.get("http://localhost:3000/api/admin/dashboard/status-counts", {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📈 Status counts response:', statusResponse.data);
@@ -159,7 +158,7 @@ export default function AdminDashboard() {
   // New audit functions
   const loadAuditStats = async () => {
     try {
-      const response = await axios.get('http://192.168.73.1:3000/api/admin/audit-stats?timeRange=24h', {
+      const response = await axios.get('http://localhost:3000/api/admin/audit-stats?timeRange=24h', {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       })
       if (response.data.success) {
@@ -178,7 +177,7 @@ export default function AdminDashboard() {
         ...filters
       })
 
-      const response = await axios.get(`http://192.168.73.1:3000/api/admin/audit-logs?${params}`, {
+      const response = await axios.get(`http://localhost:3000/api/admin/audit-logs?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       })
       
@@ -255,7 +254,7 @@ export default function AdminDashboard() {
 
       console.log('🔄 Starting CSV export...');
       
-      const response = await axios.get("http://192.168.73.1:3000/api/admin/dashboard/export-csv", {
+      const response = await axios.get("http://localhost:3000/api/admin/dashboard/export-csv", {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -302,7 +301,7 @@ export default function AdminDashboard() {
     try {
       console.log('🏥 Starting health check...');
       
-      const response = await axios.get('http://192.168.73.1:3000/api/admin/health', {
+      const response = await axios.get('http://localhost:3000/api/admin/health', {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       });
       
@@ -553,7 +552,7 @@ export default function AdminDashboard() {
 
               <Card className="bg-gray-800/90 border-gray-700 hover:scale-105 transition-transform duration-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xs sm:text-sm font-medium text-gray-200">Expired Tokens</CardTitle>
+                  <CardTitle className="text-xs sm:text-sm font-medium text-gray-200">Total Expired Tokens</CardTitle>
                   <Clock className="h-4 w-4 text-blue-400" />
                 </CardHeader>
                 <CardContent>

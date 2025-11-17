@@ -187,11 +187,20 @@ exports.changePassword = async (req, res) => {
 // Add this unified login function
 exports.login = async (req, res) => {
   try {
+    console.log("Login request received:", {
+      body: req.body,
+      headers: req.headers,
+      method: req.method
+    });
+
     const { email, password } = req.body;
 
     if (!email || !password) {
+      console.log("Missing credentials:", { email: !!email, password: !!password });
       return res.status(400).json({ success: false, message: "Email and password are required" });
     }
+
+    console.log("Attempting Supabase auth for email:", email);
 
     // Authenticate with Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -200,19 +209,25 @@ exports.login = async (req, res) => {
     });
 
     if (error || !data?.user) {
+      console.log("Supabase auth failed:", error);
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
+    console.log("Supabase auth successful, fetching user data");
+
     // Get user role from your users table
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from("users")
       .select("*")
       .eq("email", email)
       .single();
 
-    if (!userData) {
+    if (userError || !userData) {
+      console.log("User data fetch failed:", userError);
       return res.status(403).json({ success: false, message: "User not found" });
     }
+
+    console.log("Login successful for user:", email);
 
     // Return access token, role, and redirect info
     return res.json({
@@ -228,6 +243,6 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    return res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 };

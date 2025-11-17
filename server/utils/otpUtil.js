@@ -58,5 +58,5 @@ module.exports = {
   storeOTP,
   isOTPValid,
   deleteOTP,
-  otpStore, // ✅ Exported now
+  otpStore, 
 };

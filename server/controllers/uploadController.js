@@ -113,8 +113,7 @@ exports.handleUpload = async function (req, res) {
     return res.status(400).send("❌ Receiver email is required.");
   }
 
-  const user = req.user; // Provided by your auth middleware
-  // Use user.email as sender_email
+  const user = req.user; 
 
   const storageToken = randomUUID();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
@@ -122,7 +121,7 @@ exports.handleUpload = async function (req, res) {
   const { error: insertError } = await supabase.from("file_shares").insert([
     {
       user_id: user.id,
-      sender_email: user.email, // <-- Use the logged-in user's email
+      sender_email: user.email, 
       receiver_email: receiverEmail,
       storage_token: storageToken,
       status: "Pending",
@@ -136,6 +135,12 @@ exports.handleUpload = async function (req, res) {
     return res.status(500).send("❌ Failed to store metadata.");
   }
 
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error("❌ JWT_SECRET not found in environment variables");
+    return res.status(500).send("❌ Server configuration error.");
+  }
+
   const downloadToken = jwt.sign(
     {
       filename: encryptedFileName,
@@ -144,7 +149,7 @@ exports.handleUpload = async function (req, res) {
       keyVersion,
       storageToken,
     },
-    process.env.JWT_SECRET,
+    jwtSecret,
     { expiresIn: "5m" }
   );
 
@@ -163,18 +168,17 @@ exports.handleUpload = async function (req, res) {
     storageToken
   );
 
-  // ✅ Send access token and link separately in the same email
   const nodemailer = require("nodemailer");
 
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     auth: {
-      user: process.env.EMAIL_USER, // set in your .env
-      pass: process.env.EMAIL_PASS, // set in your .env
+      user: process.env.EMAIL_USER, 
+      pass: process.env.EMAIL_PASS, 
     },
   });
-
-  
 
   const downloadUrl = `http://localhost:3001/download?token=${encodeURIComponent(downloadToken)}`; // Include token in URL
 
@@ -234,20 +238,17 @@ exports.handleUpload = async function (req, res) {
     'SUCCESS'
   );
   
-  // ...existing code...
+  // ✅ Response for normal operation (no longer testing mode)
   res.json({
-    accessToken: downloadToken,
-    message: "File uploaded and encrypted successfully. OTP sent to email and phone.",
+    success: true,
+    message: "File uploaded and encrypted successfully. Access token and OTP have been sent.",
+    uploadInfo: {
+      fileName: originalName,
+      expiresAt: new Date(otpExpiresAt).toISOString(),
+      emailSentTo: email,
+      smsSentTo: phoneNumber
+    }
   });
-  // ...existing code...
-
-  // res.send(`
-  //   <h3>✅ File uploaded and encrypted successfully.</h3>
-  //   <p><strong>Access Token:</strong></p>
-  //   <textarea cols="100" rows="3">${downloadToken}</textarea>
-  //   <p>📧 OTP has been sent to: <strong>${email}</strong></p>
-  //   <p>➡️ <a href="/download" target="_blank">Receiver Download Page</a></p>
-  // `);
 
   const deleteTimeout = setTimeout(async () => {
     // Fetch file_name from Supabase for this storageToken
