@@ -15,6 +15,35 @@ Chart.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcEleme
 import AdminSidebarLayout from "@/components/layout/AdminSidebarLayout"
 import { API_ENDPOINTS } from "@/lib/config"
 
+// Add custom styles for datetime inputs in dark mode
+const dateTimeInputStyles = `
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit {
+    color: rgb(229, 231, 235);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-text {
+    color: rgb(156, 163, 175);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-month-field {
+    color: rgb(229, 231, 235);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-day-field {
+    color: rgb(229, 231, 235);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-year-field {
+    color: rgb(229, 231, 235);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-hour-field {
+    color: rgb(229, 231, 235);
+  }
+  input[type="datetime-local"]::-webkit-datetime-edit-minute-field {
+    color: rgb(229, 231, 235);
+  }
+`
+
 export default function AdminDashboard() {
   const router = useRouter()
 
@@ -62,8 +91,10 @@ export default function AdminDashboard() {
     startDate: '',
     endDate: ''
   })
+  const [currentAuditFilters, setCurrentAuditFilters] = useState({}) // Track applied filters
   const [auditPage, setAuditPage] = useState(0)
   const auditPageSize = 50
+  const [isLoadingAuditLogs, setIsLoadingAuditLogs] = useState(false)
 
   // Add health check state - Fix the type structure to include error property
   const [healthData, setHealthData] = useState({
@@ -147,7 +178,7 @@ export default function AdminDashboard() {
 
       // Fetch audit stats
       loadAuditStats();
-      loadAuditLogs();
+      loadAuditLogs({}, 0); // Start with no filters and page 0
 
       // Fetch health data
       loadHealthCheck();
@@ -170,32 +201,53 @@ export default function AdminDashboard() {
     }
   }
 
-  const loadAuditLogs = async (filters = {}) => {
+  const loadAuditLogs = async (filters = {}, page = auditPage) => {
+    setIsLoadingAuditLogs(true);
     try {
       const params = new URLSearchParams({
         limit: auditPageSize.toString(),
-        offset: (auditPage * auditPageSize).toString(),
+        offset: (page * auditPageSize).toString(),
         ...filters
       })
 
+      console.log('🔍 Loading audit logs with filters:', filters, 'page:', page)
+      console.log('🔗 API URL:', `${API_ENDPOINTS.ADMIN.AUDIT_LOGS}?${params.toString()}`)
+      
       const response = await axios.get(`${API_ENDPOINTS.ADMIN.AUDIT_LOGS}?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       })
       
+      console.log('📋 Audit logs API response:', response.data)
+      
       if (response.data.success) {
+        console.log('📋 Audit logs loaded:', response.data.data.length, 'records')
         setAuditLogs(response.data.data)
       }
     } catch (error) {
       console.error('Error loading audit logs:', error)
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Error details:', error.response?.data)
+      }
+    } finally {
+      setIsLoadingAuditLogs(false);
     }
   }
 
   const applyAuditFilters = () => {
+    // Validate date range
+    if (auditFilters.startDate && auditFilters.endDate && auditFilters.startDate > auditFilters.endDate) {
+      alert('Start date cannot be later than end date')
+      return
+    }
+
     const filters = Object.fromEntries(
       Object.entries(auditFilters).filter(([_, value]) => value !== '')
     )
+    console.log('🔍 Applying audit filters:', filters)
+    console.log('🔍 Current auditFilters state:', auditFilters)
+    setCurrentAuditFilters(filters)
     setAuditPage(0)
-    loadAuditLogs(filters)
+    loadAuditLogs(filters, 0)
   }
 
   const clearAuditFilters = () => {
@@ -206,13 +258,71 @@ export default function AdminDashboard() {
       startDate: '',
       endDate: ''
     })
+    setCurrentAuditFilters({})
     setAuditPage(0)
-    loadAuditLogs()
+    loadAuditLogs({}, 0)
   }
 
-  const exportAuditLogs = () => {
-    const csv = convertToCSV(auditLogs)
-    downloadCSV(csv, 'audit-logs.csv')
+  // Helper function to set quick date ranges
+  const setQuickDateRange = (range: string) => {
+    const now = new Date()
+    const endDate = now.toISOString().slice(0, 16) // Format for datetime-local
+    let startDate = ''
+
+    switch (range) {
+      case 'today':
+        const todayStart = new Date(now)
+        todayStart.setHours(0, 0, 0, 0)
+        startDate = todayStart.toISOString().slice(0, 16)
+        break
+      case 'yesterday':
+        const yesterday = new Date(now)
+        yesterday.setDate(now.getDate() - 1)
+        yesterday.setHours(0, 0, 0, 0)
+        startDate = yesterday.toISOString().slice(0, 16)
+        const yesterdayEnd = new Date(yesterday)
+        yesterdayEnd.setHours(23, 59, 59, 999)
+        const endYesterday = yesterdayEnd.toISOString().slice(0, 16)
+        setAuditFilters(prev => ({...prev, startDate, endDate: endYesterday}))
+        return
+      case 'week':
+        const weekAgo = new Date(now)
+        weekAgo.setDate(now.getDate() - 7)
+        startDate = weekAgo.toISOString().slice(0, 16)
+        break
+      case 'month':
+        const monthAgo = new Date(now)
+        monthAgo.setMonth(now.getMonth() - 1)
+        startDate = monthAgo.toISOString().slice(0, 16)
+        break
+    }
+
+    setAuditFilters(prev => ({...prev, startDate, endDate}))
+  }
+
+  const exportAuditLogs = async () => {
+    try {
+      // Get all audit logs with current filters (not just the current page)
+      const params = new URLSearchParams({
+        limit: '1000', // Get more records for export
+        offset: '0',
+        ...currentAuditFilters
+      })
+
+      console.log('📤 Exporting audit logs with filters:', currentAuditFilters)
+      
+      const response = await axios.get(`${API_ENDPOINTS.ADMIN.AUDIT_LOGS}?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
+      })
+      
+      if (response.data.success) {
+        const csv = convertToCSV(response.data.data)
+        downloadCSV(csv, `audit-logs-${new Date().toISOString().split('T')[0]}.csv`)
+      }
+    } catch (error) {
+      console.error('Error exporting audit logs:', error)
+      alert('Export failed. Please try again.')
+    }
   }
 
   const convertToCSV = (logs: any[]) => {
@@ -365,6 +475,19 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Inject custom styles for datetime inputs
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = dateTimeInputStyles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
+    };
+  }, []);
+
   const getStatusBgColor = (status: string) => {
     switch (status) {
       case 'Downloaded': 
@@ -380,6 +503,7 @@ export default function AdminDashboard() {
       case 'PENDING': 
         return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
       default: 
+        console.log('🎨 Unknown status color for:', status)
         return 'bg-gray-500/20 text-gray-400 border border-gray-500/30';
     }
   };
@@ -395,10 +519,20 @@ export default function AdminDashboard() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'healthy': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'unhealthy': return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'degraded': return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-      default: return <Clock className="w-4 h-4 text-gray-400" />;
+      case 'healthy':
+      case 'Downloaded':
+      case 'SUCCESS':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'unhealthy':
+      case 'Expired':
+      case 'FAILED':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'degraded':
+      case 'Revoked':
+      case 'PENDING':
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      default: 
+        return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
 
@@ -1070,35 +1204,106 @@ export default function AdminDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Start Date</label>
-                    <Input
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Start Date 
+                      {auditFilters.startDate && <span className="text-blue-400 ml-1">✓</span>}
+                    </label>
+                    <input
                       type="datetime-local"
                       value={auditFilters.startDate}
                       onChange={(e) => setAuditFilters({...auditFilters, startDate: e.target.value})}
-                      className="bg-gray-700 border-gray-600 text-gray-200"
+                      className={`w-full bg-gray-700 border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm hover:border-gray-500 transition-colors ${
+                        auditFilters.startDate ? 'border-blue-500 text-gray-100' : 'border-gray-600 text-gray-200'
+                      }`}
+                      title="Select start date and time for filtering"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">End Date</label>
-                    <Input
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      End Date 
+                      {auditFilters.endDate && <span className="text-blue-400 ml-1">✓</span>}
+                    </label>
+                    <input
                       type="datetime-local"
                       value={auditFilters.endDate}
                       onChange={(e) => setAuditFilters({...auditFilters, endDate: e.target.value})}
-                      className="bg-gray-700 border-gray-600 text-gray-200"
+                      className={`w-full bg-gray-700 border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm hover:border-gray-500 transition-colors ${
+                        auditFilters.endDate ? 'border-blue-500 text-gray-100' : 'border-gray-600 text-gray-200'
+                      }`}
+                      title="Select end date and time for filtering"
+                      min={auditFilters.startDate || undefined}
                     />
                   </div>
                 </div>
+
+                {/* Quick Date Range Buttons */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="text-sm text-gray-400 mr-2">Quick ranges:</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDateRange('today')}
+                    className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDateRange('yesterday')}
+                    className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded"
+                  >
+                    Yesterday
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDateRange('week')}
+                    className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded"
+                  >
+                    Last 7 days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDateRange('month')}
+                    className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded"
+                  >
+                    Last 30 days
+                  </button>
+                </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button onClick={applyAuditFilters} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    Apply Filters
+                  <Button 
+                    onClick={applyAuditFilters} 
+                    disabled={isLoadingAuditLogs}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isLoadingAuditLogs ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Loading...
+                      </>
+                    ) : (
+                      'Apply Filters'
+                    )}
                   </Button>
-                  <Button onClick={clearAuditFilters} variant="outline" className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700">
+                  <Button 
+                    onClick={clearAuditFilters} 
+                    variant="outline" 
+                    disabled={isLoadingAuditLogs}
+                    className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
+                  >
                     Clear Filters
                   </Button>
-                  <Button onClick={exportAuditLogs} className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button 
+                    onClick={exportAuditLogs} 
+                    disabled={isLoadingAuditLogs}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Export CSV
                   </Button>
+                  {Object.keys(currentAuditFilters).length > 0 && (
+                    <div className="text-xs text-gray-400 flex items-center">
+                      <span>Active filters: {Object.entries(currentAuditFilters).map(([key, value]) => `${key}=${value}`).join(', ')}</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1106,68 +1311,103 @@ export default function AdminDashboard() {
             {/* Audit Logs Table */}
             <Card className="bg-gray-800/90 border-gray-700 animate-fade-in">
               <CardHeader>
-                <CardTitle className="text-gray-100 text-base sm:text-lg">📋 Recent Audit Logs</CardTitle>
+                <CardTitle className="text-gray-100 text-base sm:text-lg flex items-center justify-between">
+                  📋 Recent Audit Logs
+                  {Object.keys(currentAuditFilters).length > 0 && (
+                    <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                      Filtered ({Object.keys(currentAuditFilters).length} active)
+                    </span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs sm:text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left p-2 text-gray-300">Timestamp</th>
-                        <th className="text-left p-2 text-gray-300">Action</th>
-                        <th className="text-left p-2 text-gray-300">User</th>
-                        <th className="text-left p-2 text-gray-300">Status</th>
-                        <th className="text-left p-2 text-gray-300">IP Address</th>
-                        <th className="text-left p-2 text-gray-300">Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map((log: any) => (
-                        <tr key={log.id} className="border-b border-gray-700/50 hover:bg-gray-700/50 transition-colors">
-                          <td className="p-2 text-gray-200">
-                            {formatDateTime(log.timestamp)}
-                          </td>
-                          <td className="p-2">
-                            <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                              {log.action_type}
-                            </span>
-                          </td>
-                          <td className="p-2 text-gray-200">{log.user_email}</td>
-                          <td className="p-2">
-                            <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-md ${getStatusBgColor(log.status)}`}>
-                              {getStatusIcon(log.status)}
-                              <span className="text-xs font-medium">{log.status}</span>
-                            </div>
-                          </td>
-                          <td className="p-2 text-gray-200">{log.ip_address || '—'}</td>
-                          <td className="p-2 text-gray-200">
-                            <pre className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(log.details, null, 2)}</pre>
-                          </td>
+                {isLoadingAuditLogs && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <span className="ml-2 text-gray-400">Loading audit logs...</span>
+                  </div>
+                )}
+                
+                {!isLoadingAuditLogs && auditLogs.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400">
+                      {Object.keys(currentAuditFilters).length > 0 
+                        ? "No audit logs found matching the selected filters" 
+                        : "No audit logs available"
+                      }
+                    </p>
+                  </div>
+                )}
+                
+                {!isLoadingAuditLogs && auditLogs.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-700">
+                          <th className="text-left p-2 text-gray-300">Timestamp</th>
+                          <th className="text-left p-2 text-gray-300">Action</th>
+                          <th className="text-left p-2 text-gray-300">User</th>
+                          <th className="text-left p-2 text-gray-300">Status</th>
+                          <th className="text-left p-2 text-gray-300">IP Address</th>
+                          <th className="text-left p-2 text-gray-300">Details</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {auditLogs.map((log: any) => (
+                          <tr key={log.id} className="border-b border-gray-700/50 hover:bg-gray-700/50 transition-colors">
+                            <td className="p-2 text-gray-200">
+                              {formatDateTime(log.timestamp)}
+                            </td>
+                            <td className="p-2">
+                              <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                {log.action_type}
+                              </span>
+                            </td>
+                            <td className="p-2 text-gray-200">{log.user_email}</td>
+                            <td className="p-2">
+                              <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-md ${getStatusBgColor(log.status)}`}>
+                                {getStatusIcon(log.status)}
+                                <span className="text-xs font-medium">{log.status}</span>
+                              </div>
+                            </td>
+                            <td className="p-2 text-gray-200">{log.ip_address || '—'}</td>
+                            <td className="p-2 text-gray-200">
+                              <pre className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(log.details, null, 2)}</pre>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 {/* Pagination Controls */}
                 <div className="flex flex-col sm:flex-row justify-end items-center mt-4 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
-                    disabled={auditPage === 0}
-                    onClick={() => setAuditPage(auditPage - 1)}
+                    disabled={auditPage === 0 || isLoadingAuditLogs}
+                    onClick={() => {
+                      const newPage = auditPage - 1;
+                      setAuditPage(newPage);
+                      loadAuditLogs(currentAuditFilters, newPage);
+                    }}
                   >
                     Previous
                   </Button>
                   <span className="text-gray-400 text-xs sm:text-sm">
-                    Page {auditPage + 1} of {Math.ceil(auditLogs.length / auditPageSize)}
+                    Page {auditPage + 1}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
                     className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700"
-                    disabled={auditLogs.length < auditPageSize}
-                    onClick={() => setAuditPage(auditPage + 1)}
+                    disabled={auditLogs.length < auditPageSize || isLoadingAuditLogs}
+                    onClick={() => {
+                      const newPage = auditPage + 1;
+                      setAuditPage(newPage);
+                      loadAuditLogs(currentAuditFilters, newPage);
+                    }}
                   >
                     Next
                   </Button>
