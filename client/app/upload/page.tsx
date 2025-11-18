@@ -16,6 +16,7 @@ import { Upload, CheckCircle, FileText, Mail, ArrowLeft, Phone, X } from "lucide
 import Link from "next/link"
 import UserSidebarLayout from "@/components/layout/UserSidebarLayout"
 import { useRouter } from "next/navigation"
+import { API_ENDPOINTS } from "@/lib/config"
 
 const allowedTypes = [
   "application/pdf",
@@ -98,7 +99,7 @@ export default function UploadPage() {
       const token = localStorage.getItem("accessToken");
 
       const res = await axios.post(
-        "http://192.168.0.100:3000/api/upload/files", // Add the extra "/upload"
+        API_ENDPOINTS.UPLOAD.FILE, // Use config instead of hardcoded URL
         formData,
         {
           headers: {

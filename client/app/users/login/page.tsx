@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { API_ENDPOINTS } from "@/lib/config"
 
 export default function Login() {
   const router = useRouter()
@@ -26,7 +27,7 @@ export default function Login() {
     setError("")
 
     try {
-      const response = await axios.post("http://192.168.0.100:3000/api/auth/login", {
+      const response = await axios.post(API_ENDPOINTS.AUTH.LOGIN, {
         email: formData.email,
         password: formData.password
       })

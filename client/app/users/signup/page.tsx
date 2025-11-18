@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import toast, { Toaster } from "react-hot-toast"
+import { API_ENDPOINTS } from "@/lib/config"
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -46,7 +47,7 @@ export default function UserSignupPage() {
     setSuccess("")
     setIsLoading(true)
     try {
-      const res = await axios.post("http://localhost:3000/api/auth/signup", {
+      const res = await axios.post(API_ENDPOINTS.AUTH.SIGNUP, {
         email: formData.email,
         password: formData.password,
       })

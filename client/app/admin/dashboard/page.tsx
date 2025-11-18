@@ -13,6 +13,7 @@ import { Chart, BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElem
 Chart.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement)
 
 import AdminSidebarLayout from "@/components/layout/AdminSidebarLayout"
+import { API_ENDPOINTS } from "@/lib/config"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -116,21 +117,21 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         // Fetch dashboard stats
-        const statsResponse = await axios.get("http://localhost:3000/api/admin/dashboard/stats", {
+        const statsResponse = await axios.get(API_ENDPOINTS.ADMIN.DASHBOARD.STATS, {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📊 Stats response:', statsResponse.data);
         setStats(statsResponse.data);
 
         // Fetch file transfer data
-        const filesResponse = await axios.get("http://localhost:3000/api/admin/dashboard/files", {
+        const filesResponse = await axios.get(API_ENDPOINTS.ADMIN.DASHBOARD.FILES, {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📁 Files response:', filesResponse.data);
         setFileData(filesResponse.data);
 
         // Fetch status counts
-        const statusResponse = await axios.get("http://localhost:3000/api/admin/dashboard/status-counts", {
+        const statusResponse = await axios.get(API_ENDPOINTS.ADMIN.DASHBOARD.STATUS_COUNTS, {
           headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
         });
         console.log('📈 Status counts response:', statusResponse.data);
@@ -158,7 +159,7 @@ export default function AdminDashboard() {
   // New audit functions
   const loadAuditStats = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/api/admin/audit-stats?timeRange=24h', {
+      const response = await axios.get(`${API_ENDPOINTS.ADMIN.AUDIT_STATS}?timeRange=24h`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       })
       if (response.data.success) {
@@ -177,7 +178,7 @@ export default function AdminDashboard() {
         ...filters
       })
 
-      const response = await axios.get(`http://localhost:3000/api/admin/audit-logs?${params}`, {
+      const response = await axios.get(`${API_ENDPOINTS.ADMIN.AUDIT_LOGS}?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       })
       
@@ -254,7 +255,7 @@ export default function AdminDashboard() {
 
       console.log('🔄 Starting CSV export...');
       
-      const response = await axios.get("http://localhost:3000/api/admin/dashboard/export-csv", {
+      const response = await axios.get(API_ENDPOINTS.ADMIN.DASHBOARD.EXPORT_CSV, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -301,7 +302,7 @@ export default function AdminDashboard() {
     try {
       console.log('🏥 Starting health check...');
       
-      const response = await axios.get('http://localhost:3000/api/admin/health', {
+      const response = await axios.get(API_ENDPOINTS.ADMIN.HEALTH, {
         headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` }
       });
       

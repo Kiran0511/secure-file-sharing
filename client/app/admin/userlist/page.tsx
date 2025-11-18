@@ -9,6 +9,7 @@ import AdminSidebarLayout from "@/components/layout/AdminSidebarLayout"
 import axios from "axios"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/components/ui/use-toast"
+import { API_ENDPOINTS } from "@/lib/config"
 
 export default function UserListPage() {
     const router = useRouter()
@@ -41,7 +42,7 @@ export default function UserListPage() {
             router.replace("/users/login")
             return
         }
-        axios.get("http://localhost:3000/api/admin/users", {
+        axios.get(API_ENDPOINTS.ADMIN.USERS, {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => setUsers(res.data))
@@ -57,7 +58,7 @@ export default function UserListPage() {
         const token = localStorage.getItem("accessToken")
         try {
             const res = await axios.post(
-                "http://localhost:3000/api/admin/update-user-role",
+                API_ENDPOINTS.ADMIN.UPDATE_USER_ROLE,
                 { userId: id, newRole: updatedRole },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -82,7 +83,7 @@ export default function UserListPage() {
         const token = localStorage.getItem("accessToken")
         try {
             const res = await axios.post(
-                "http://localhost:3000/api/users/revoke",
+                API_ENDPOINTS.USER.REVOKE,
                 { uploadId },
                 {
                     headers: { Authorization: `Bearer ${token}` }

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Key, Eye, EyeOff, ShieldCheck, AlertCircle } from "lucide-react"
 import axios from "axios"
 import UserSidebarLayout from "@/components/layout/UserSidebarLayout"
+import { API_ENDPOINTS } from "@/lib/config"
 
 export default function ChangePasswordPage() {
   const router = useRouter()
@@ -46,7 +47,7 @@ export default function ChangePasswordPage() {
     setIsLoading(true)
     try {
       const token = localStorage.getItem("accessToken")
-      const res = await axios.post("http://localhost:3000/api/changepassword", {
+      const res = await axios.post(API_ENDPOINTS.USER.CHANGE_PASSWORD, {
         currentPassword,
         newPassword
       }, {

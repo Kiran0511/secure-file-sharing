@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Download, AlertCircle, CheckCircle, FileText, Key, ArrowLeft, Lock } from "lucide-react"
 import Link from "next/link"
+import { API_ENDPOINTS } from "@/lib/config"
 
 // Zod schema for validation
 const schema = z.object({
@@ -78,7 +79,7 @@ export default function DownloadPage() {
     setMessage(null)
     try {
       const res = await axios.post(
-        "http://localhost:3000/api/verify-otp",
+        API_ENDPOINTS.DOWNLOAD.VERIFY,
         { token: formData.token, otp: formData.otp },
         { responseType: "blob" }
       )

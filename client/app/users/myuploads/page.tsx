@@ -19,6 +19,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { API_ENDPOINTS } from "@/lib/config"
 
 export default function MyUploadsPage() {
     const router = useRouter()
@@ -59,7 +60,7 @@ export default function MyUploadsPage() {
             return
         }
         axios
-            .get("http://localhost:3000/api/users/myuploads", {
+            .get(API_ENDPOINTS.USER.MY_UPLOADS, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
@@ -79,7 +80,7 @@ export default function MyUploadsPage() {
         const token = localStorage.getItem("accessToken")
         try {
             const res = await axios.post(
-                `http://localhost:3000/api/users/revoke-upload`,
+                API_ENDPOINTS.USER.REVOKE_UPLOAD,
                 { uploadId: id },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
