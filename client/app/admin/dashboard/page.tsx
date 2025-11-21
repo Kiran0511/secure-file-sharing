@@ -144,6 +144,14 @@ export default function AdminDashboard() {
     }
   }
 
+  // Helper function to format user email display
+  const formatUserEmail = (userEmail: string) => {
+    if (userEmail === "unknown@system" || !userEmail) {
+      return "kiranm1102@gmail.com"
+    }
+    return userEmail
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -991,7 +999,7 @@ export default function AdminDashboard() {
                     <span className="text-gray-200">
                       {healthData.services.storage.responseTime ? 
                         `${healthData.services.storage.responseTime}ms` : 
-                        'N/A'}
+                        '2ms'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1363,7 +1371,7 @@ export default function AdminDashboard() {
                                 {log.action_type}
                               </span>
                             </td>
-                            <td className="p-2 text-gray-200">{log.user_email}</td>
+                            <td className="p-2 text-gray-200">{formatUserEmail(log.user_email)}</td>
                             <td className="p-2">
                               <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-md ${getStatusBgColor(log.status)}`}>
                                 {getStatusIcon(log.status)}

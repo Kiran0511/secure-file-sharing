@@ -1,6 +1,6 @@
 // API Configuration
 // Change this IP address to match your host machine's IP
-const API_BASE_URL = "http://192.168.0.100:3000"
+const API_BASE_URL = "http://localhost:3000"
 
 export const API_ENDPOINTS = {
   // Base URL
